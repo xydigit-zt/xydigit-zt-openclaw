@@ -1532,3 +1532,77 @@ export async function untrackClawHubSkill(workspaceDir: string, slug: string): P
   delete lock.skills[trackedSlug];
   await writeClawHubSkillsLockfile(workspaceDir, lock);
 }
+
+export type SkillUninstallPlan = {
+  slug: string;
+  workspaceDir: string;
+  skillDir: string | null;
+  skillDirExists: boolean;
+  lockfileEntryExists: boolean;
+  isClawHubInstall: boolean;
+};
+
+export type SkillUninstallResult = {
+  plan: SkillUninstallPlan;
+  removedSkillDir: boolean;
+  removedLockfileEntry: boolean;
+  warnings: string[];
+};
+
+export async function planSkillUninstall(
+  workspaceDir: string,
+  slug: string,
+): Promise<SkillUninstallPlan> {
+  const validatedSlug = validateRequestedSkillSlug(slug);
+  const skillDir = resolveWorkspaceSkillInstallDir(workspaceDir, validatedSlug);
+  const lock = await readClawHubSkillsLockfile(workspaceDir);
+  const lockfileEntryExists = Boolean(lock.skills[validatedSlug]);
+  const skillDirExists = await pathExists(skillDir);
+  const isClawHubInstall =
+    lockfileEntryExists && (await pathExists(path.join(skillDir, DOT_DIR, "origin.json")));
+  return {
+    slug: validatedSlug,
+    workspaceDir,
+    skillDir,
+    skillDirExists,
+    lockfileEntryExists,
+    isClawHubInstall,
+  };
+}
+
+export async function executeSkillUninstall(
+  plan: SkillUninstallPlan,
+  logger: { info: (msg: string) => void; warn: (msg: string) => void },
+): Promise<SkillUninstallResult> {
+  const warnings: string[] = [];
+  let removedSkillDir = false;
+  let removedLockfileEntry = false;
+  if (plan.skillDirExists) {
+    try {
+      await fs.rm(plan.skillDir, { recursive: true, force: true });
+      removedSkillDir = true;
+      logger.info(`Removed skill directory: ${plan.skillDir}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      warnings.push(`Failed to remove skill directory: ${msg}`);
+      logger.warn(`Failed to remove skill directory: ${msg}`);
+    }
+  }
+  if (plan.lockfileEntryExists) {
+    try {
+      await untrackClawHubSkill(plan.workspaceDir, plan.slug);
+      removedLockfileEntry = true;
+      logger.info(`Removed lockfile entry: .clawhub/lock.json#${plan.slug}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      warnings.push(`Failed to remove lockfile entry: ${msg}`);
+      logger.warn(`Failed to remove lockfile entry: ${msg}`);
+    }
+  }
+  return {
+    plan,
+    removedSkillDir,
+    removedLockfileEntry,
+    warnings,
+  };
+}

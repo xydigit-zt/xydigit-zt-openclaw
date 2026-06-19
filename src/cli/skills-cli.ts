@@ -20,7 +20,9 @@ import {
 } from "../infra/clawhub.js";
 import { defaultRuntime } from "../runtime.js";
 import {
+  executeSkillUninstall,
   installSkillFromClawHub,
+  planSkillUninstall,
   readVerifiedClawHubSkillSourceUrl,
   readTrackedClawHubSkillSlugs,
   resolveClawHubSkillVerificationTarget,
@@ -405,6 +407,71 @@ export function registerSkillsCli(program: Command) {
             return;
           }
           defaultRuntime.log(`Installed ${result.slug}@${result.version} -> ${result.targetDir}`);
+        } catch (err) {
+          defaultRuntime.error(String(err));
+          defaultRuntime.exit(1);
+        }
+      },
+    );
+
+  skills
+    .command("uninstall")
+    .description("Uninstall a ClawHub-installed skill from the workspace")
+    .argument("<slug>", "Skill slug to uninstall")
+    .option("--dry-run", "Show what would be removed, no changes", false)
+    .option("--yes", "Skip confirmation prompt", false)
+    .option("--json", "Output as JSON", false)
+    .option("--global", "Uninstall from the shared managed skills directory", false)
+    .option("--agent <id>", "Target agent workspace (defaults to cwd-inferred, then default agent)")
+    .action(
+      async (
+        slug: string,
+        opts: { dryRun?: boolean; yes?: boolean; json?: boolean; global?: boolean; agent?: string },
+        command: Command,
+      ) => {
+        try {
+          const workspaceDir = resolveClawHubTargetWorkspaceDir(command, opts);
+          if (!workspaceDir) {
+            return;
+          }
+          const plan = await planSkillUninstall(workspaceDir, slug);
+          if (opts.json) {
+            defaultRuntime.writeJson({ plan });
+            return;
+          }
+          if (!plan.skillDirExists && !plan.lockfileEntryExists) {
+            defaultRuntime.log(`Skill '${slug}' is not installed in ${workspaceDir}`);
+            return;
+          }
+          if (opts.dryRun) {
+            defaultRuntime.log(
+              `The following would be removed:\n` +
+                `  - workspace directory:  ${plan.skillDir}\n` +
+                `  - lockfile entry:       .clawhub/lock.json#${plan.slug}\n` +
+                `(dry-run: no changes will be made)`,
+            );
+            return;
+          }
+          if (!opts.yes) {
+            const { promptYesNo } = await import("./prompt.js");
+            const confirmed = await promptYesNo(`Proceed with uninstall?`, undefined);
+            if (!confirmed) {
+              defaultRuntime.log("Uninstall cancelled.");
+              return;
+            }
+          }
+          const result = await executeSkillUninstall(plan, {
+            info: (msg) => defaultRuntime.log(msg),
+            warn: (msg) => defaultRuntime.log(theme.warn(msg)),
+          });
+          defaultRuntime.log(`Uninstalled ${slug}:`);
+          defaultRuntime.log(`  ${result.removedSkillDir ? "✓" : "✗"} removed workspace directory`);
+          defaultRuntime.log(`  ${result.removedLockfileEntry ? "✓" : "✗"} removed lockfile entry`);
+          if (result.warnings.length > 0) {
+            for (const warning of result.warnings) {
+              defaultRuntime.log(theme.warn(warning));
+            }
+          }
         } catch (err) {
           defaultRuntime.error(String(err));
           defaultRuntime.exit(1);
