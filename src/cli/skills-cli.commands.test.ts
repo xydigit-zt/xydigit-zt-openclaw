@@ -91,6 +91,8 @@ const mocks = vi.hoisted(() => {
     readClawHubSkillsLockfileStatusSyncMock: vi.fn((..._args: unknown[]) => ({ kind: "missing" })),
     resolveClawHubSkillStatusLinkSyncMock: vi.fn(),
     resolveLocalSkillCardStatusSyncMock: vi.fn(),
+    planSkillUninstallMock: vi.fn(),
+    executeSkillUninstallMock: vi.fn(),
     fetchClawHubSkillVerificationMock: vi.fn(),
     fetchClawHubSkillCardMock: vi.fn(),
     buildWorkspaceSkillStatusMock,
@@ -209,6 +211,8 @@ vi.mock("../skills/lifecycle/clawhub.js", () => ({
     mocks.resolveClawHubSkillStatusLinkSyncMock(...args),
   resolveLocalSkillCardStatusSync: (...args: unknown[]) =>
     mocks.resolveLocalSkillCardStatusSyncMock(...args),
+  planSkillUninstall: (...args: unknown[]) => mocks.planSkillUninstallMock(...args),
+  executeSkillUninstall: (...args: unknown[]) => mocks.executeSkillUninstallMock(...args),
 }));
 
 vi.mock("../infra/clawhub.js", () => ({
