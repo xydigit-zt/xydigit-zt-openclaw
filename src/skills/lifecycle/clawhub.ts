@@ -1556,31 +1556,48 @@ export async function planSkillUninstall(
   workspaceDir: string,
   slug: string,
 ): Promise<SkillUninstallPlan> {
-  const parsedRef = slug.trim().startsWith("@")
-    ? parseRequestedClawHubSkillRef(slug)
-    : { slug: validateRequestedSkillSlug(slug) };
-  const requestedOwnerHandle = parsedRef.ownerHandle;
-  const validatedSlug = parsedRef.slug;
-  const skillDir = resolveWorkspaceSkillInstallDir(workspaceDir, validatedSlug);
+  const requested = slug.trim();
+  const requestedRef = requested.startsWith("@")
+    ? parseRequestedClawHubSkillRef(requested)
+    : { slug: normalizeTrackedSkillSlug(requested) };
+  const requestedOwnerHandle = requestedRef.ownerHandle;
+  const candidateSlug = requestedRef.slug;
+  const skillDir = resolveWorkspaceSkillInstallDir(workspaceDir, candidateSlug);
   const lock = await readClawHubSkillsLockfile(workspaceDir);
-  const lockEntry = lock.skills[validatedSlug];
-  const lockfileEntryExists = Boolean(lockEntry);
-  const skillDirExists = await pathExists(skillDir);
+
+  // Resolve the actual tracked slug: read origin metadata first
+  // (matches resolveRequestedUpdateSlug behavior), then check lockfile.
+  const trackedOrigin = await readClawHubSkillOrigin(skillDir);
+  const trackedLockEntry = lock.skills[candidateSlug];
+  const isTracked = Boolean(trackedOrigin || trackedLockEntry);
+
+  // For tracked slugs accept legacy names; for untracked validate strictly.
+  const resolvedSlug = isTracked ? candidateSlug : validateRequestedSkillSlug(candidateSlug);
+  const resolvedSkillDir = isTracked ? skillDir : resolveWorkspaceSkillInstallDir(workspaceDir, resolvedSlug);
+  const resolvedLockEntry = isTracked ? trackedLockEntry : lock.skills[resolvedSlug];
+
+  const lockfileEntryExists = Boolean(resolvedLockEntry);
+  const skillDirExists = await pathExists(resolvedSkillDir);
+
+  // Origin provenance: check for .clawhub/origin.json or .clawdhub/origin.json
   const originExists =
-    (await pathExists(path.join(skillDir, DOT_DIR, "origin.json"))) ||
-    (await pathExists(path.join(skillDir, LEGACY_DOT_DIR, "origin.json")));
+    Boolean(trackedOrigin) ||
+    (await pathExists(path.join(resolvedSkillDir, DOT_DIR, "origin.json"))) ||
+    (await pathExists(path.join(resolvedSkillDir, LEGACY_DOT_DIR, "origin.json")));
   const isClawHubInstall = lockfileEntryExists && originExists;
-  const trackedOwnerHandle = lockEntry?.ownerHandle;
+
+  // Derive owner from origin metadata first, fall back to lockfile
+  // (matches resolveRequestedUpdateSlug owner comparison).
+  const trackedOwnerHandle = trackedOrigin?.ownerHandle ?? resolvedLockEntry?.ownerHandle;
   const ownerMismatch =
     requestedOwnerHandle && trackedOwnerHandle && requestedOwnerHandle !== trackedOwnerHandle;
-  const hasRequestedOwner = Boolean(requestedOwnerHandle);
-  const hasTrackedOwner = Boolean(trackedOwnerHandle);
-  const ownerRequiredButMissing = hasRequestedOwner && !hasTrackedOwner;
+  const ownerRequiredButMissing = Boolean(requestedOwnerHandle) && !trackedOwnerHandle;
+
   return {
-    slug: validatedSlug,
+    slug: resolvedSlug,
     ownerHandle: requestedOwnerHandle,
     workspaceDir,
-    skillDir,
+    skillDir: resolvedSkillDir,
     skillDirExists,
     lockfileEntryExists,
     isClawHubInstall,
