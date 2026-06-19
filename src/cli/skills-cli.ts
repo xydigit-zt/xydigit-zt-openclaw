@@ -435,10 +435,6 @@ export function registerSkillsCli(program: Command) {
             return;
           }
           const plan = await planSkillUninstall(workspaceDir, slug);
-          if (opts.json) {
-            defaultRuntime.writeJson({ plan });
-            return;
-          }
           if (!plan.skillDirExists && !plan.lockfileEntryExists) {
             defaultRuntime.log(`Skill '${slug}' is not installed in ${workspaceDir}`);
             return;
@@ -464,6 +460,10 @@ export function registerSkillsCli(program: Command) {
             info: (msg) => defaultRuntime.log(msg),
             warn: (msg) => defaultRuntime.log(theme.warn(msg)),
           });
+          if (opts.json) {
+            defaultRuntime.writeJson({ result });
+            return;
+          }
           defaultRuntime.log(`Uninstalled ${slug}:`);
           defaultRuntime.log(`  ${result.removedSkillDir ? "✓" : "✗"} removed workspace directory`);
           defaultRuntime.log(`  ${result.removedLockfileEntry ? "✓" : "✗"} removed lockfile entry`);

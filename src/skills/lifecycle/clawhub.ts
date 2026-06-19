@@ -1536,7 +1536,7 @@ export async function untrackClawHubSkill(workspaceDir: string, slug: string): P
 export type SkillUninstallPlan = {
   slug: string;
   workspaceDir: string;
-  skillDir: string | null;
+  skillDir: string;
   skillDirExists: boolean;
   lockfileEntryExists: boolean;
   isClawHubInstall: boolean;
@@ -1577,7 +1577,7 @@ export async function executeSkillUninstall(
   const warnings: string[] = [];
   let removedSkillDir = false;
   let removedLockfileEntry = false;
-  if (plan.skillDirExists) {
+  if (plan.skillDirExists && plan.isClawHubInstall) {
     try {
       await fs.rm(plan.skillDir, { recursive: true, force: true });
       removedSkillDir = true;
@@ -1587,6 +1587,13 @@ export async function executeSkillUninstall(
       warnings.push(`Failed to remove skill directory: ${msg}`);
       logger.warn(`Failed to remove skill directory: ${msg}`);
     }
+  } else if (plan.skillDirExists && !plan.isClawHubInstall) {
+    warnings.push(
+      `Skill directory exists but is not a ClawHub install (.clawhub/origin.json missing). Skipping directory removal.`,
+    );
+    logger.warn(
+      `Skill directory exists but is not a ClawHub install. Use "rm -rf" to remove manually.`,
+    );
   }
   if (plan.lockfileEntryExists) {
     try {
