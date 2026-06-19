@@ -457,8 +457,8 @@ export function registerSkillsCli(program: Command) {
             }
           }
           const result = await executeSkillUninstall(plan, {
-            info: (msg) => defaultRuntime.log(msg),
-            warn: (msg) => defaultRuntime.log(theme.warn(msg)),
+            info: opts.json ? () => {} : (msg) => defaultRuntime.log(msg),
+            warn: opts.json ? () => {} : (msg) => defaultRuntime.log(theme.warn(msg)),
           });
           if (opts.json) {
             defaultRuntime.writeJson({ result });
