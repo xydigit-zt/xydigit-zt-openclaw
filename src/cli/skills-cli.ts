@@ -436,10 +436,20 @@ export function registerSkillsCli(program: Command) {
           }
           const plan = await planSkillUninstall(workspaceDir, slug);
           if (!plan.skillDirExists && !plan.lockfileEntryExists) {
+            if (opts.json) {
+              defaultRuntime.writeJson({
+                error: `Skill '${slug}' is not installed in ${workspaceDir}`,
+              });
+              return;
+            }
             defaultRuntime.log(`Skill '${slug}' is not installed in ${workspaceDir}`);
             return;
           }
           if (opts.dryRun) {
+            if (opts.json) {
+              defaultRuntime.writeJson({ plan, dryRun: true });
+              return;
+            }
             defaultRuntime.log(
               `The following would be removed:\n` +
                 `  - workspace directory:  ${plan.skillDir}\n` +
@@ -452,6 +462,10 @@ export function registerSkillsCli(program: Command) {
             const { promptYesNo } = await import("./prompt.js");
             const confirmed = await promptYesNo(`Proceed with uninstall?`, undefined);
             if (!confirmed) {
+              if (opts.json) {
+                defaultRuntime.writeJson({ cancelled: true });
+                return;
+              }
               defaultRuntime.log("Uninstall cancelled.");
               return;
             }
