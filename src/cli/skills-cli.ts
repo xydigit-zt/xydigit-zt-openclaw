@@ -443,7 +443,7 @@ export function registerSkillsCli(program: Command) {
               return;
             }
             defaultRuntime.log(
-              `Owner mismatch: skill '${slug}' is tracked under a different owner. Use without --owner prefix to remove.`,
+              `Owner mismatch: skill '${slug}' is tracked under a different owner. Use the slug without @owner prefix to remove.`,
             );
             return;
           }
@@ -455,7 +455,7 @@ export function registerSkillsCli(program: Command) {
               return;
             }
             defaultRuntime.log(
-              `Owner mismatch: skill '${slug}' has no owner record in lockfile. Use without --owner prefix to remove.`,
+              `Owner mismatch: skill '${slug}' has no owner record in lockfile. Use the slug without @owner prefix to remove.`,
             );
             return;
           }

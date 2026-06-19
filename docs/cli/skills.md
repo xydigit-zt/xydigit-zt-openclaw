@@ -30,11 +30,17 @@ openclaw skills install @owner/<slug> --version <version>
 openclaw skills install git:owner/repo
 openclaw skills install git:owner/repo@main
 openclaw skills install ./path/to/skill --as custom-name
-openclaw skills install @owner/<slug> --force
-openclaw skills install @owner/<slug> --agent <id>
-openclaw skills install @owner/<slug> --global
-openclaw skills update @owner/<slug>
-openclaw skills update @owner/<slug> --global
+openclaw skills install <slug> --force
+openclaw skills install <slug> --agent <id>
+openclaw skills install <slug> --global
+openclaw skills uninstall <slug>
+openclaw skills uninstall <slug> --dry-run
+openclaw skills uninstall <slug> --yes
+openclaw skills uninstall <slug> --json
+openclaw skills uninstall <slug> --global
+openclaw skills uninstall <slug> --agent <id>
+openclaw skills update <slug>
+openclaw skills update <slug> --global
 openclaw skills update --all
 openclaw skills update --all --agent <id>
 openclaw skills update --all --global
