@@ -435,6 +435,30 @@ export function registerSkillsCli(program: Command) {
             return;
           }
           const plan = await planSkillUninstall(workspaceDir, slug);
+          if (plan.ownerMismatch) {
+            if (opts.json) {
+              defaultRuntime.writeJson({
+                error: `Owner mismatch: skill '${slug}' is tracked under a different owner`,
+              });
+              return;
+            }
+            defaultRuntime.log(
+              `Owner mismatch: skill '${slug}' is tracked under a different owner. Use without --owner prefix to remove.`,
+            );
+            return;
+          }
+          if (plan.ownerRequiredButMissing) {
+            if (opts.json) {
+              defaultRuntime.writeJson({
+                error: `Owner mismatch: skill '${slug}' has no owner record in lockfile`,
+              });
+              return;
+            }
+            defaultRuntime.log(
+              `Owner mismatch: skill '${slug}' has no owner record in lockfile. Use without --owner prefix to remove.`,
+            );
+            return;
+          }
           if (!plan.skillDirExists && !plan.lockfileEntryExists) {
             if (opts.json) {
               defaultRuntime.writeJson({
