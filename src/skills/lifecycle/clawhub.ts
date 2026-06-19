@@ -1573,7 +1573,9 @@ export async function planSkillUninstall(
 
   // For tracked slugs accept legacy names; for untracked validate strictly.
   const resolvedSlug = isTracked ? candidateSlug : validateRequestedSkillSlug(candidateSlug);
-  const resolvedSkillDir = isTracked ? skillDir : resolveWorkspaceSkillInstallDir(workspaceDir, resolvedSlug);
+  const resolvedSkillDir = isTracked
+    ? skillDir
+    : resolveWorkspaceSkillInstallDir(workspaceDir, resolvedSlug);
   const resolvedLockEntry = isTracked ? trackedLockEntry : lock.skills[resolvedSlug];
 
   const lockfileEntryExists = Boolean(resolvedLockEntry);
@@ -1584,7 +1586,11 @@ export async function planSkillUninstall(
     Boolean(trackedOrigin) ||
     (await pathExists(path.join(resolvedSkillDir, DOT_DIR, "origin.json"))) ||
     (await pathExists(path.join(resolvedSkillDir, LEGACY_DOT_DIR, "origin.json")));
-  const isClawHubInstall = lockfileEntryExists && originExists;
+  // A skill is considered a ClawHub install if the directory has origin metadata.
+  // This allows origin-only installs (no lockfile entry) to be uninstalled.
+  // For stale lock-only entries (lock exists, no origin), isClawHubInstall is false,
+  // which allows executeSkillUninstall to remove only the lockfile entry.
+  const isClawHubInstall = originExists;
 
   // Derive owner from origin metadata first, fall back to lockfile
   // (matches resolveRequestedUpdateSlug owner comparison).

@@ -483,13 +483,16 @@ export function registerSkillsCli(program: Command) {
             return;
           }
           if (!opts.yes) {
+            // JSON mode requires --yes to confirm destructive actions
+            if (opts.json) {
+              defaultRuntime.writeJson({
+                error: `Skill '${slug}' uninstall requires --yes to confirm when using --json`,
+              });
+              return;
+            }
             const { promptYesNo } = await import("./prompt.js");
             const confirmed = await promptYesNo(`Proceed with uninstall?`, undefined);
             if (!confirmed) {
-              if (opts.json) {
-                defaultRuntime.writeJson({ cancelled: true });
-                return;
-              }
               defaultRuntime.log("Uninstall cancelled.");
               return;
             }
