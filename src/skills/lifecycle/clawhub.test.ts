@@ -2097,7 +2097,10 @@ describe("skill uninstall lifecycle", () => {
     const workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-uninstall-"));
     try {
       await setupClawHubInstall({ workspaceDir, slug: "stale-skill" });
-      await fs.rm(path.join(workspaceDir, "skills", "stale-skill"), { recursive: true, force: true });
+      await fs.rm(path.join(workspaceDir, "skills", "stale-skill"), {
+        recursive: true,
+        force: true,
+      });
       useRealPathExists();
 
       const plan = await planSkillUninstall(workspaceDir, "stale-skill");
@@ -2189,16 +2192,33 @@ describe("skill uninstall lifecycle", () => {
       await fs.writeFile(
         path.join(skillDir, ".clawhub", "origin.json"),
         JSON.stringify(
-          { version: 1, registry: "https://clawhub.ai", slug: legacySlug, installedVersion: "1.0.0", installedAt: Date.now() },
-          null, 2,
+          {
+            version: 1,
+            registry: "https://clawhub.ai",
+            slug: legacySlug,
+            installedVersion: "1.0.0",
+            installedAt: Date.now(),
+          },
+          null,
+          2,
         ) + "\n",
       );
       await fs.mkdir(path.join(workspaceDir, ".clawhub"), { recursive: true });
       await fs.writeFile(
         path.join(workspaceDir, ".clawhub", "lock.json"),
         JSON.stringify(
-          { version: 1, skills: { [legacySlug]: { version: "1.0.0", installedAt: Date.now(), registry: "https://clawhub.ai" } } },
-          null, 2,
+          {
+            version: 1,
+            skills: {
+              [legacySlug]: {
+                version: "1.0.0",
+                installedAt: Date.now(),
+                registry: "https://clawhub.ai",
+              },
+            },
+          },
+          null,
+          2,
         ) + "\n",
       );
       useRealPathExists();
@@ -2213,6 +2233,59 @@ describe("skill uninstall lifecycle", () => {
       expect(result.removedSkillDir).toBe(true);
       expect(result.removedLockfileEntry).toBe(true);
       await expect(fs.access(skillDir)).rejects.toThrow();
+    } finally {
+      await fs.rm(workspaceDir, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses to remove skill dir when origin.json is malformed JSON", async () => {
+    const workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-uninstall-"));
+    try {
+      const skillDir = path.join(workspaceDir, "skills", "bad-json");
+      await fs.mkdir(path.join(skillDir, ".clawhub"), { recursive: true });
+      await fs.writeFile(
+        path.join(skillDir, ".clawhub", "origin.json"),
+        "{ this is not valid json",
+        "utf8",
+      );
+      await fs.writeFile(path.join(skillDir, "SKILL.md"), "# bad\n", "utf8");
+      useRealPathExists();
+
+      const plan = await planSkillUninstall(workspaceDir, "bad-json");
+      expect(plan.skillDirExists).toBe(true);
+      expect(plan.isClawHubInstall).toBe(false);
+
+      const result = await executeSkillUninstall(plan, { info: vi.fn(), warn: vi.fn() });
+      expect(result.removedSkillDir).toBe(false);
+      expect(result.warnings.some((w) => w.includes("not a ClawHub install"))).toBe(true);
+      await expect(fs.access(skillDir)).resolves.toBeUndefined();
+    } finally {
+      await fs.rm(workspaceDir, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses to remove skill dir when origin.json is a stray empty marker", async () => {
+    const workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-uninstall-"));
+    try {
+      const skillDir = path.join(workspaceDir, "skills", "stray-marker");
+      await fs.mkdir(path.join(skillDir, ".clawhub"), { recursive: true });
+      // Missing required fields: no registry, slug, installedVersion
+      await fs.writeFile(
+        path.join(skillDir, ".clawhub", "origin.json"),
+        JSON.stringify({ version: 1 }) + "\n",
+        "utf8",
+      );
+      await fs.writeFile(path.join(skillDir, "SKILL.md"), "# stray\n", "utf8");
+      useRealPathExists();
+
+      const plan = await planSkillUninstall(workspaceDir, "stray-marker");
+      expect(plan.skillDirExists).toBe(true);
+      expect(plan.isClawHubInstall).toBe(false);
+
+      const result = await executeSkillUninstall(plan, { info: vi.fn(), warn: vi.fn() });
+      expect(result.removedSkillDir).toBe(false);
+      expect(result.warnings.some((w) => w.includes("not a ClawHub install"))).toBe(true);
+      await expect(fs.access(skillDir)).resolves.toBeUndefined();
     } finally {
       await fs.rm(workspaceDir, { recursive: true, force: true });
     }
