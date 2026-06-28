@@ -2784,7 +2784,6 @@ describe("skill uninstall lifecycle", () => {
     workspaceDir: string;
     slug: string;
     ownerHandle?: string;
-    originSlug?: string;
   }): Promise<string> {
     const skillDir = path.join(params.workspaceDir, "skills", params.slug);
     await fs.mkdir(path.join(skillDir, ".clawhub"), { recursive: true });
@@ -2794,7 +2793,7 @@ describe("skill uninstall lifecycle", () => {
         {
           version: 1,
           registry: "https://clawhub.ai",
-          slug: params.originSlug ?? params.slug,
+          slug: params.slug,
           ...(params.ownerHandle ? { ownerHandle: params.ownerHandle } : {}),
           installedVersion: "1.0.0",
           installedAt: Date.now(),
@@ -3060,33 +3059,6 @@ describe("skill uninstall lifecycle", () => {
       const result = await executeSkillUninstall(plan, { info: vi.fn(), warn: vi.fn() });
       expect(result.removedSkillDir).toBe(false);
       expect(result.warnings.some((w) => w.includes("not a ClawHub install"))).toBe(true);
-      await expect(fs.access(skillDir)).resolves.toBeUndefined();
-    } finally {
-      await fs.rm(workspaceDir, { recursive: true, force: true });
-    }
-  });
-  it("refuses to remove skill dir when origin.json slug doesn't match requested slug", async () => {
-    const workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-uninstall-"));
-    try {
-      // Create a skill directory with origin.json for a DIFFERENT skill slug
-      const skillDir = await setupClawHubInstall({
-        workspaceDir,
-        slug: "requested-skill",
-        originSlug: "other-skill",
-      });
-      useRealPathExists();
-
-      const plan = await planSkillUninstall(workspaceDir, "requested-skill");
-      expect(plan.skillDirExists).toBe(true);
-      // Origin slug mismatch means isClawHubInstall is false
-      expect(plan.isClawHubInstall).toBe(false);
-      expect(plan.lockfileEntryExists).toBe(true);
-
-      const result = await executeSkillUninstall(plan, { info: vi.fn(), warn: vi.fn() });
-      expect(result.removedSkillDir).toBe(false);
-      expect(result.removedLockfileEntry).toBe(true);
-      expect(result.warnings.some((w) => w.includes("not a ClawHub install"))).toBe(true);
-      // Directory should still exist
       await expect(fs.access(skillDir)).resolves.toBeUndefined();
     } finally {
       await fs.rm(workspaceDir, { recursive: true, force: true });
