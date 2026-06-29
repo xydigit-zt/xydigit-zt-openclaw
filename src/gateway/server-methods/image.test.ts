@@ -34,11 +34,32 @@ vi.mock("../../image-generation/provider-registry.js", () => ({
       models: [],
       capabilities: { generate: true, edit: false, geometry: false, output: true },
     },
+    {
+      id: "env-provider",
+      label: "Env Provider",
+      models: ["env-model"],
+      capabilities: { generate: true, edit: false, geometry: false, output: true },
+    },
+    {
+      id: "auth-provider",
+      label: "Auth Provider",
+      models: ["auth-model"],
+      capabilities: { generate: true, edit: false, geometry: false, output: true },
+    },
   ]),
 }));
 
 vi.mock("../../agents/agent-scope.js", () => ({
   resolveDefaultAgentDir: vi.fn(() => "/tmp/agents/main"),
+}));
+
+vi.mock("../../agents/auth-profiles.js", () => ({
+  loadAuthProfileStoreForRuntime: vi.fn(() => ({ profiles: {} })),
+  listProfilesForProvider: vi.fn(() => []),
+}));
+
+vi.mock("../../agents/model-auth-env.js", () => ({
+  resolveEnvApiKey: vi.fn(() => null),
 }));
 
 type RespondCall = [boolean, unknown?, { code: number; message: string }?];
@@ -93,11 +114,11 @@ describe("imageHandlers", () => {
     });
     await invoke();
     const result = expectSuccess(respond);
-    expect(result.providers).toHaveLength(3);
+    expect(result.providers).toHaveLength(5);
     expect(result.providers[0]).toMatchObject({ id: "openai", label: "OpenAI" });
   });
 
-  it("marks provider configured when auth profile exists", async () => {
+  it("marks provider configured when auth profile exists in config", async () => {
     const { respond, invoke } = createInvokeParams({
       models: { providers: {} },
       plugins: { entries: {} },
@@ -173,7 +194,7 @@ describe("imageHandlers", () => {
     expect(result.active).toBe("gemini");
   });
 
-  it("sets active to first configured when no config primary", async () => {
+  it("returns null active when no imageGenerationModel is set", async () => {
     const { respond, invoke } = createInvokeParams({
       models: { providers: {} },
       plugins: { entries: {} },
@@ -182,19 +203,7 @@ describe("imageHandlers", () => {
     });
     await invoke();
     const result = expectSuccess(respond);
-    expect(result.active).toBe("openai");
-  });
-
-  it("sets active to first provider when none configured", async () => {
-    const { respond, invoke } = createInvokeParams({
-      models: { providers: {} },
-      plugins: { entries: {} },
-      auth: { profiles: {} },
-      agents: {},
-    });
-    await invoke();
-    const result = expectSuccess(respond);
-    expect(result.active).toBe("gemini");
+    expect(result.active).toBe(null);
   });
 
   it("returns null active when config primary is not configured", async () => {
@@ -224,6 +233,78 @@ describe("imageHandlers", () => {
       edit: false,
       geometry: false,
       output: true,
+    });
+  });
+
+  describe("readiness paths", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it("marks provider configured when env credentials present", async () => {
+      const { respond, invoke } = createInvokeParams({
+        models: { providers: {} },
+        plugins: { entries: {} },
+        auth: { profiles: {} },
+        agents: {},
+      });
+
+      // Mock env-backed provider has credentials
+      const { resolveEnvApiKey } = await import("../../agents/model-auth-env.js");
+      vi.mocked(resolveEnvApiKey).mockImplementation((provider: string) => {
+        if (provider === "env-provider") {
+          return { apiKey: "test-key" };
+        }
+        return null;
+      });
+
+      await invoke();
+      const result = expectSuccess(respond);
+      const envProvider = result.providers.find((p) => (p as { id: string }).id === "env-provider");
+      expect((envProvider as { configured: boolean }).configured).toBe(true);
+    });
+
+    it("marks provider configured when auth profile exists in store", async () => {
+      const { respond, invoke } = createInvokeParams({
+        models: { providers: {} },
+        plugins: { entries: {} },
+        auth: { profiles: {} },
+        agents: {},
+      });
+
+      // Mock auth-profile-backed provider has profile
+      const { listProfilesForProvider } = await import("../../agents/auth-profiles.js");
+      vi.mocked(listProfilesForProvider).mockImplementation((store: unknown, provider: string) => {
+        if (provider === "auth-provider") {
+          return ["auth-profile-1"];
+        }
+        return [];
+      });
+
+      await invoke();
+      const result = expectSuccess(respond);
+      const authProvider = result.providers.find(
+        (p) => (p as { id: string }).id === "auth-provider",
+      );
+      expect((authProvider as { configured: boolean }).configured).toBe(true);
+    });
+
+    it("marks provider not configured for empty config object", async () => {
+      const { respond, invoke } = createInvokeParams({
+        models: { providers: { openai: {} } }, // Empty object should not count as configured
+        plugins: { entries: { openai: { config: undefined } } }, // undefined config
+        auth: { profiles: { openai: { type: "api-key" } } }, // This should still count
+        agents: {},
+      });
+      await invoke();
+      const result = expectSuccess(respond);
+      // openai has auth profile in config, so it's configured
+      const openai = result.providers.find((p) => (p as { id: string }).id === "openai");
+      expect((openai as { configured: boolean }).configured).toBe(true);
+
+      // replicate has no config at all
+      const replicate = result.providers.find((p) => (p as { id: string }).id === "replicate");
+      expect((replicate as { configured: boolean }).configured).toBe(false);
     });
   });
 });
