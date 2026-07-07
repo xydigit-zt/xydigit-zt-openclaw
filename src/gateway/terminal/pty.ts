@@ -94,7 +94,7 @@ export function killPtyTree(
   const sig = (signal ?? "SIGKILL") as NodeJS.Signals;
   try {
     if ((sig === "SIGKILL" || sig === "SIGTERM") && typeof pty.pid === "number" && pty.pid > 0) {
-      signalProcessTree(pty.pid, sig);
+      signalProcessTree(pty.pid, sig, { detached: true });
     } else if (process.platform === "win32") {
       pty.kill();
     } else {

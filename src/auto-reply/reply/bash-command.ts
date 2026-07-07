@@ -317,7 +317,7 @@ export async function handleBashChatCommand(params: {
       };
     }
     const { killProcessTree } = await import("../../process/kill-tree.js");
-    killProcessTree(pid);
+    killProcessTree(pid, { detached: true });
     return {
       text: `⚙️ bash stopping (session ${formatSessionSnippet(sessionId)}). Use !poll ${sessionId} to confirm exit.`,
     };
