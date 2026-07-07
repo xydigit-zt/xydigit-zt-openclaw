@@ -233,7 +233,7 @@ export function createProcessTool(
     if (typeof pid !== "number" || !Number.isFinite(pid) || pid <= 0) {
       return false;
     }
-    killProcessTree(pid);
+    killProcessTree(pid, { detached: true });
     return true;
   };
 

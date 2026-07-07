@@ -833,7 +833,7 @@ async function waitForProcessExit(pid: number, timeoutMs: number): Promise<boole
 
 async function terminateGatewayProcessTree(pid: number, graceMs: number): Promise<void> {
   if (process.platform !== "win32") {
-    killProcessTree(pid, { graceMs });
+    killProcessTree(pid, { graceMs, detached: true });
     return;
   }
   const taskkillPath = getWindowsSystem32ExePath("taskkill.exe");
