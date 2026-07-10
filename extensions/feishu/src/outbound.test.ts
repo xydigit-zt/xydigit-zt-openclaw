@@ -15,8 +15,23 @@ const sendStructuredCardFeishuMock = vi.hoisted(() => vi.fn());
 const deliverCommentThreadTextMock = vi.hoisted(() => vi.fn());
 const cleanupAmbientCommentTypingReactionMock = vi.hoisted(() => vi.fn(async () => false));
 const shouldSuppressFeishuTextForVoiceMediaMock = vi.hoisted(
-  () => (params: { mediaUrl?: string; audioAsVoice?: boolean }) =>
-    params.audioAsVoice === true || /\.(?:ogg|opus)(?:[?#]|$)/i.test(params.mediaUrl ?? ""),
+  () =>
+    (params: {
+      mediaUrl?: string;
+      audioAsVoice?: boolean;
+      ttsSupplement?: { spokenText?: string; visibleTextAlreadyDelivered?: boolean };
+    }) => {
+      // Priority 1: TTS supplement metadata
+      if (params.ttsSupplement?.spokenText) {
+        return params.ttsSupplement.visibleTextAlreadyDelivered === true;
+      }
+      // Priority 2: Explicit audioAsVoice flag
+      if (params.audioAsVoice === true) {
+        return true;
+      }
+      // Priority 3: Native voice audio detection
+      return /\.(?:ogg|opus)(?:[?#]|$)/i.test(params.mediaUrl ?? "");
+    },
 );
 
 vi.mock("./media.js", () => ({
@@ -1653,6 +1668,59 @@ describe("feishuOutbound.sendMedia replyToId forwarding", () => {
 
     expect(sendMessageFeishuMock).toHaveBeenCalledTimes(1);
     expect(sendMessageCall()?.text).toBe("spoken reply\n\n📎 https://example.com/reply.mp3");
+  });
+
+  it("sends text and voice separately for TTS supplement when text not yet delivered", async () => {
+    sendMessageFeishuMock.mockResolvedValueOnce({ messageId: "text_msg" });
+    sendMediaFeishuMock.mockResolvedValueOnce({ messageId: "voice_msg" });
+
+    await feishuOutbound.sendMedia?.({
+      cfg: emptyConfig,
+      to: "chat_1",
+      text: "TTS spoken text",
+      mediaUrl: "https://example.com/tts.mp3",
+      audioAsVoice: true,
+      accountId: "main",
+      ttsSupplement: {
+        spokenText: "TTS spoken text",
+        visibleTextAlreadyDelivered: false,
+      },
+    });
+
+    // Should send text first (via sendMessageFeishu or sendMarkdownCardFeishu)
+    const textSendCount =
+      sendMessageFeishuMock.mock.calls.length + sendMarkdownCardFeishuMock.mock.calls.length;
+    expect(textSendCount).toBeGreaterThanOrEqual(1);
+
+    // Then send voice media
+    expect(sendMediaFeishuMock).toHaveBeenCalledTimes(1);
+    expect(sendMediaCall()?.mediaUrl).toBe("https://example.com/tts.mp3");
+    expect(sendMediaCall()?.audioAsVoice).toBe(true);
+  });
+
+  it("sends only voice for TTS supplement when text already delivered", async () => {
+    sendMediaFeishuMock.mockResolvedValueOnce({ messageId: "voice_msg" });
+
+    await feishuOutbound.sendMedia?.({
+      cfg: emptyConfig,
+      to: "chat_1",
+      text: "Text already sent via streaming",
+      mediaUrl: "https://example.com/tts.mp3",
+      audioAsVoice: true,
+      accountId: "main",
+      ttsSupplement: {
+        spokenText: "Text already sent via streaming",
+        visibleTextAlreadyDelivered: true,
+      },
+    });
+
+    // Should NOT send text (already delivered)
+    expect(sendMessageFeishuMock).not.toHaveBeenCalled();
+
+    // Should only send voice media
+    expect(sendMediaFeishuMock).toHaveBeenCalledTimes(1);
+    expect(sendMediaCall()?.mediaUrl).toBe("https://example.com/tts.mp3");
+    expect(sendMediaCall()?.audioAsVoice).toBe(true);
   });
 
   it("forwards replyToId to text caption send", async () => {

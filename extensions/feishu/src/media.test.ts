@@ -213,6 +213,44 @@ describe("sendMediaFeishu msg_type routing", () => {
     ).toBe(false);
   });
 
+  it("suppresses text for TTS supplement when text already delivered", () => {
+    expect(
+      shouldSuppressFeishuTextForVoiceMedia({
+        mediaUrl: "https://example.com/tts.mp3",
+        audioAsVoice: true,
+        ttsSupplement: {
+          spokenText: "Text already sent via streaming",
+          visibleTextAlreadyDelivered: true,
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it("does not suppress text for TTS supplement when text not yet delivered", () => {
+    expect(
+      shouldSuppressFeishuTextForVoiceMedia({
+        mediaUrl: "https://example.com/tts.mp3",
+        audioAsVoice: true,
+        ttsSupplement: {
+          spokenText: "Fresh TTS reply text",
+          visibleTextAlreadyDelivered: false,
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it("does not suppress text for TTS supplement without visibleTextAlreadyDelivered flag", () => {
+    expect(
+      shouldSuppressFeishuTextForVoiceMedia({
+        mediaUrl: "https://example.com/tts.mp3",
+        audioAsVoice: true,
+        ttsSupplement: {
+          spokenText: "TTS text without delivery flag",
+        },
+      }),
+    ).toBe(false);
+  });
+
   it("uses msg_type=media for mp4 video", async () => {
     runFfprobeMock.mockResolvedValueOnce("4.2\n");
 

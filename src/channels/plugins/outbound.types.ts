@@ -3,7 +3,7 @@
  *
  * Defines text/media/payload/poll contexts, presentation capabilities, and send results.
  */
-import type { ReplyPayload } from "../../auto-reply/reply-payload.js";
+import type { ReplyPayload, ReplyPayloadTtsSupplement } from "../../auto-reply/reply-payload.js";
 import type { ReplyToMode } from "../../config/types.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import type { OutboundDeliveryResult } from "../../infra/outbound/deliver-types.js";
@@ -46,6 +46,8 @@ export type ChannelOutboundContext = {
   onPlatformSendDispatch?: () => Promise<void>;
   /** @internal Report each completed platform sub-send before starting another fallible step. */
   onDeliveryResult?: (result: OutboundDeliveryResult) => Promise<void> | void;
+  /** TTS supplement metadata for precise text suppression control. */
+  ttsSupplement?: ReplyPayloadTtsSupplement;
 };
 
 export type ChannelOutboundPayloadContext = ChannelOutboundContext & {
