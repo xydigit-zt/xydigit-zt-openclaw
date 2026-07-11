@@ -1,5 +1,5 @@
 // Test for openMeetWithBrowserRequest tab selection logic (regression #103385)
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach, type MockedFunction } from "vitest";
 import type { GoogleMeetConfig, GoogleMeetMode } from "../config.js";
 import type { BrowserTab } from "./chrome-browser-proxy.js";
 
@@ -13,13 +13,13 @@ type BrowserRequestParams = {
 type BrowserRequestCaller = (params: BrowserRequestParams) => Promise<unknown>;
 
 describe("openMeetWithBrowserRequest tab selection (regression #103385)", () => {
-  let callBrowser: BrowserRequestCaller;
+  let callBrowser: MockedFunction<BrowserRequestCaller>;
   const meetingCode = "abc-defg-hij";
   const englishUrl = `https://meet.google.com/${meetingCode}?hl=en`;
   const japaneseUrl = `https://meet.google.com/${meetingCode}?hl=ja`;
 
   beforeEach(() => {
-    callBrowser = vi.fn() as BrowserRequestCaller;
+    callBrowser = vi.fn();
   });
 
   afterEach(() => {
@@ -65,16 +65,16 @@ describe("openMeetWithBrowserRequest tab selection (regression #103385)", () => 
 
     // Should NOT have focused the Japanese tab
     const focusCalls = callBrowser.mock.calls.filter(
-      (call: any) => call[0].method === "POST" && call[0].path === "/tabs/focus",
+      (call) => call[0].method === "POST" && call[0].path === "/tabs/focus",
     );
     expect(focusCalls).toHaveLength(0);
 
     // Should have opened a new tab with hl=en
     const openCalls = callBrowser.mock.calls.filter(
-      (call: any) => call[0].method === "POST" && call[0].path === "/tabs/open",
+      (call) => call[0].method === "POST" && call[0].path === "/tabs/open",
     );
     expect(openCalls).toHaveLength(1);
-    expect(openCalls[0][0].body.url).toContain("hl=en");
+    expect((openCalls[0][0].body as { url: string }).url).toContain("hl=en");
   });
 
   it("reuses existing English tab without opening new one", async () => {
@@ -113,14 +113,14 @@ describe("openMeetWithBrowserRequest tab selection (regression #103385)", () => 
 
     // Should have focused the English tab
     const focusCalls = callBrowser.mock.calls.filter(
-      (call: any) => call[0].method === "POST" && call[0].path === "/tabs/focus",
+      (call) => call[0].method === "POST" && call[0].path === "/tabs/focus",
     );
     expect(focusCalls).toHaveLength(1);
-    expect(focusCalls[0][0].body.targetId).toBe("en-tab-789");
+    expect((focusCalls[0][0].body as { targetId: string }).targetId).toBe("en-tab-789");
 
     // Should NOT have opened a new tab
     const openCalls = callBrowser.mock.calls.filter(
-      (call: any) => call[0].method === "POST" && call[0].path === "/tabs/open",
+      (call) => call[0].method === "POST" && call[0].path === "/tabs/open",
     );
     expect(openCalls).toHaveLength(0);
   });
@@ -168,10 +168,10 @@ describe("openMeetWithBrowserRequest tab selection (regression #103385)", () => 
 
     // Should have focused the English tab
     const focusCalls = callBrowser.mock.calls.filter(
-      (call: any) => call[0].method === "POST" && call[0].path === "/tabs/focus",
+      (call) => call[0].method === "POST" && call[0].path === "/tabs/focus",
     );
     expect(focusCalls).toHaveLength(1);
-    expect(focusCalls[0][0].body.targetId).toBe("en-tab-222");
+    expect((focusCalls[0][0].body as { targetId: string }).targetId).toBe("en-tab-222");
   });
 
   it("skips tab without hl parameter (ambiguous locale)", async () => {
@@ -211,15 +211,15 @@ describe("openMeetWithBrowserRequest tab selection (regression #103385)", () => 
 
     // Should NOT have focused the ambiguous tab
     const focusCalls = callBrowser.mock.calls.filter(
-      (call: any) => call[0].method === "POST" && call[0].path === "/tabs/focus",
+      (call) => call[0].method === "POST" && call[0].path === "/tabs/focus",
     );
     expect(focusCalls).toHaveLength(0);
 
     // Should have opened a new tab with hl=en
     const openCalls = callBrowser.mock.calls.filter(
-      (call: any) => call[0].method === "POST" && call[0].path === "/tabs/open",
+      (call) => call[0].method === "POST" && call[0].path === "/tabs/open",
     );
     expect(openCalls).toHaveLength(1);
-    expect(openCalls[0][0].body.url).toContain("hl=en");
+    expect((openCalls[0][0].body as { url: string }).url).toContain("hl=en");
   });
 });
