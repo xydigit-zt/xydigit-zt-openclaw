@@ -7,6 +7,7 @@ import {
   isChannelProgressDraftWorkToolName,
 } from "openclaw/plugin-sdk/channel-outbound";
 import {
+  getReplyPayloadTtsSupplement,
   resolveSendableOutboundReplyParts,
   resolveTextChunksWithFallback,
   sendMediaWithLeadingCaption,
@@ -658,12 +659,14 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
             : reply.text;
         const hasText = reply.hasText;
         const hasMedia = reply.hasMedia;
+        const ttsSupplement = getReplyPayloadTtsSupplement(payload);
         const hasVoiceMedia =
           hasMedia &&
           reply.mediaUrls.some((mediaUrl) =>
             shouldSuppressFeishuTextForVoiceMedia({
               mediaUrl,
               ...(payload.audioAsVoice === true ? { audioAsVoice: true } : {}),
+              ttsSupplement,
             }),
           );
         const finalTextExceedsStreamingLimit =

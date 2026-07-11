@@ -7,6 +7,7 @@ import type { MessageReceipt } from "openclaw/plugin-sdk/channel-outbound";
 import { mediaKindFromMime } from "openclaw/plugin-sdk/media-mime";
 import { MEDIA_FFMPEG_MAX_AUDIO_DURATION_SECS, runFfmpeg } from "openclaw/plugin-sdk/media-runtime";
 import { saveMediaBuffer, saveMediaStream, type SavedMedia } from "openclaw/plugin-sdk/media-store";
+import type { ReplyPayloadTtsSupplement } from "openclaw/plugin-sdk/reply-payload";
 import { readByteStreamWithLimit } from "openclaw/plugin-sdk/response-limit-runtime";
 import { readRegularFile, writeExternalFileWithinRoot } from "openclaw/plugin-sdk/security-runtime";
 import { normalizeLowercaseStringOrEmpty } from "openclaw/plugin-sdk/string-coerce-runtime";
@@ -901,10 +902,24 @@ export function shouldSuppressFeishuTextForVoiceMedia(params: {
   fileName?: string;
   contentType?: string;
   audioAsVoice?: boolean;
+  ttsSupplement?: ReplyPayloadTtsSupplement;
 }): boolean {
+  // Priority 1: TTS supplement metadata (precise control)
+  // If this is a TTS supplement payload, suppress text only when
+  // text already delivered via streaming/block/preview.
+  // For fresh TTS supplement replies, send text separately from voice.
+  if (params.ttsSupplement?.spokenText) {
+    // Only suppress if text already delivered; otherwise send both
+    return params.ttsSupplement.visibleTextAlreadyDelivered === true;
+  }
+
+  // Priority 2: Explicit audioAsVoice flag (backward compat)
+  // Keep native voice-only semantics for payloads without TTS supplement
   if (params.audioAsVoice === true) {
     return true;
   }
+
+  // Priority 3: Native voice audio detection (backward compat)
   if (
     params.fileName &&
     isFeishuNativeVoiceAudio({

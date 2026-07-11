@@ -12,6 +12,7 @@ import {
   resolveInteractiveTextFallback,
 } from "openclaw/plugin-sdk/interactive-runtime";
 import {
+  getReplyPayloadTtsSupplement,
   resolvePayloadMediaUrls,
   sendPayloadMediaSequenceAndFinalize,
   sendTextMediaPayload,
@@ -495,10 +496,21 @@ export const feishuOutbound: ChannelOutboundAdapter = {
       identity: ctx.identity,
     });
     if (!card) {
+      const ttsSupplement = getReplyPayloadTtsSupplement(ctx.payload);
       return await sendTextMediaPayload({
         channel: "feishu",
         ctx,
-        adapter: feishuOutbound,
+        adapter: {
+          ...feishuOutbound,
+          sendMedia: ttsSupplement
+            ? async (mediaParams) => {
+                return await feishuOutbound.sendMedia!({
+                  ...mediaParams,
+                  ttsSupplement,
+                });
+              }
+            : feishuOutbound.sendMedia,
+        },
       });
     }
 
@@ -651,6 +663,7 @@ export const feishuOutbound: ChannelOutboundAdapter = {
       mediaLocalRoots,
       replyToId,
       threadId,
+      ttsSupplement,
     }) => {
       const { replyToMessageId, replyInThread } = resolveFeishuMediaReplyMode({
         replyToId,
@@ -674,6 +687,7 @@ export const feishuOutbound: ChannelOutboundAdapter = {
         shouldSuppressFeishuTextForVoiceMedia({
           mediaUrl,
           audioAsVoice,
+          ttsSupplement,
         });
 
       // Send text first if provided, except for Feishu native voice bubbles.
