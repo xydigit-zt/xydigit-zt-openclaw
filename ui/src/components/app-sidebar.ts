@@ -35,7 +35,7 @@ import "./sidebar-update-card.ts";
 import "./theme-mode-toggle.ts";
 import "./tooltip.ts";
 import { normalizeAgentLabel, resolveAgentTextAvatar } from "../lib/agents/display.ts";
-import { resolveAgentAvatarUrl } from "../lib/avatar.ts";
+import { deriveAvatarInitial, resolveAgentAvatarUrl } from "../lib/avatar.ts";
 import { editorOpenUrl } from "../lib/editor-links.ts";
 import { isGatewayMethodAdvertised } from "../lib/gateway-methods.ts";
 import { startHoverMarquee, stopHoverMarquee } from "../lib/hover-marquee.ts";
@@ -3030,7 +3030,7 @@ class AppSidebar extends OpenClawLightDomContentsElement {
     const chipName = chipAgent ? normalizeAgentLabel(chipAgent) : chipAgentId;
     const chipAvatarText =
       (chipAgent ? resolveAgentTextAvatar(chipAgent) : null) ??
-      (chipName || chipAgentId).slice(0, 1).toUpperCase();
+      deriveAvatarInitial(chipName || chipAgentId);
     return html`
       <aside class="sidebar">
         <!-- The Mac app reserves this padding strip for the titlebar; presses
