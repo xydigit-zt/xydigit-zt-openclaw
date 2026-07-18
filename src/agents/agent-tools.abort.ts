@@ -38,7 +38,7 @@ function raceWithAbortSignal<T>(promise: Promise<T>, signal: AbortSignal): Promi
       },
       (error: unknown) => {
         signal.removeEventListener("abort", onAbort);
-        reject(error);
+        reject(error instanceof Error ? error : new Error(String(error)));
       },
     );
   });
